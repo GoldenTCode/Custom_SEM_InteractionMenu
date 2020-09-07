@@ -1,4 +1,5 @@
 # Custom_SEM_InteractionMenu
+
 *Multi Purpose FiveM Interaction Menu Customized*
 
 This resource is a menu with actions for LEO, Fire, Civ including Vehicle Controls, Emotes and a Priority Status!
@@ -11,20 +12,30 @@ SEM_InteractionMenu was made by Scott1 using NativeUI [LUA] | This version was c
 
 
 ### Information:
+
 Current Version for Custom Version: **v1.5.1**
 
 Changes: **• Re-Arranged most menus**
-Added: **• Settings Tab, Toggleable UI, Priority Status**
+
+Added: **• Settings Tab, Toggleable UI, riority Status**
+
 Fixes: **• Shield not working properly**
+
 Bugs: **• Priority Status shows the player that is at the top of the playerlist if priority started (Need a fix)**
+
 Options: **• Toggle UI for MY version of the Nearest Postal script, • Toggle UI for MY version of the SpeedLimit script**
+
 Options Links:
+
 **• Link to MY version of the Nearest Postal Script:** [Nearest Postal Script](https://github.com/GoldenTCode/Custom-Nearest-Postal-Script)
+
 **• Link to MY version of the SpeedLimit Script:** [SpeedLimit Script](https://github.com/GoldenTCode/Custom_Posted_Speed_Limit)
 
 
 ## ALL CREDITS GO TO SCOTT1
+
 [Original Menu - FiveM](https://forum.cfx.re/t/release-interactionmenu/912635)
+
 [Original Menu - GitHub](https://github.com/Sc0ttM/SEM_InteractionMenu)
 
 ### Links:
