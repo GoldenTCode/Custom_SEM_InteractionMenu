@@ -13,7 +13,7 @@ SEM_InteractionMenu was made by Scott1 using NativeUI [LUA] | This version was c
 
 ### Information:
 
-Current Version for Custom Version: **v1.5.1**
+Current Version for the Custom Menu: **v1.5.1**
 
 Changes: **• Re-Arranged most menus**
 
