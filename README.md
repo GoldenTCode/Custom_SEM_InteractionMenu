@@ -1,19 +1,31 @@
-# SEM_InteractionMenu
-*Multi Purpose FiveM Interaction Menu*
+# Custom_SEM_InteractionMenu
+*Multi Purpose FiveM Interaction Menu Customized*
 
-This resource is a menu with actions for LEO, Fire and Civ including Vehicle Controls and Emotes!
+This resource is a menu with actions for LEO, Fire, Civ including Vehicle Controls, Emotes and a Priority Status!
 
 Each section has features that would be used by each of the professions, for example the LEO Menu has Cuff, Drag, Seat, etc.
-Some menu features also have commands out of ease during RP.
+The Settings Menu is in WIP. The Priority Status function sort of works, When you start the priority, It will show the first person on the Playerlist (Don't know how to fix).
+I have re-arranged the Submenu's, Deleted the unassesery submenus, Fixed the Shield (So you can hold a gun and shoot.), I have also added Arrows to the right of the menus.
 
-SEM_InteractionMenu was created using NativeUI [LUA]
+SEM_InteractionMenu was made by Scott1 using NativeUI [LUA] | This version was customized by me (with a bit of help on the internet for some parts of the code)
 
 
 ### Information:
-Current Version: **v1.5.1**
+Current Version for Custom Version: **v1.5.1**
 
-Changes: **• Fixed parachutes not being able to be opened • Cuffs not showing when damage taken • Removed the ability for people to shoot while the menu it open • BAC & Inventory showing 'Empty'/'0.0' even when set**
+Changes: **• Re-Arranged most menus**
+Added: **• Settings Tab, Toggleable UI, Priority Status**
+Fixes: **• Shield not working properly**
+Bugs: **• Priority Status shows the player that is at the top of the playerlist if priority started (Need a fix)**
+Options: **• Toggle UI for MY version of the Nearest Postal script, • Toggle UI for MY version of the SpeedLimit script**
+Options Links:
+**• Link to MY version of the Nearest Postal Script:** [Nearest Postal Script](https://github.com/GoldenTCode/Custom-Nearest-Postal-Script)
+**• Link to MY version of the SpeedLimit Script:** [SpeedLimit Script](https://github.com/GoldenTCode/Custom_Posted_Speed_Limit)
 
+
+## ALL CREDITS GO TO SCOTT1
+[Original Menu - FiveM](https://forum.cfx.re/t/release-interactionmenu/912635)
+[Original Menu - GitHub](https://github.com/Sc0ttM/SEM_InteractionMenu)
 
 ### Links:
 
@@ -22,5 +34,3 @@ Support/Discord: [Click Here](https://semdevelopment.com/discord)
 Information: [Click Here](https://semdevelopment.com/releases/interactionmenu)
 
 Instruction/Docs: [Click here](https://docs.semdevelopment.com/fivem/interactionmenu)
-
-*For full changes checkout [here](https://semdevelopment.com/releases/interactionmenu/changelog)*
