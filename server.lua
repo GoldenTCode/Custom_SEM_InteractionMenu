@@ -22,6 +22,7 @@ end, false)
 
 RegisterNetEvent('isPriority')
 AddEventHandler('isPriority', function()
+	playername = GetPlayerName(-1)
 	ispriority = true
 	Citizen.Wait(1)
 	TriggerClientEvent('UpdatePriority', -1, ispriority)
@@ -183,6 +184,9 @@ end)
 
 Citizen.CreateThread(function()
 	local CurrentVersion = GetResourceMetadata(GetCurrentResourceName(), 'version', 0)
+	SetConvarServerInfo("Server", 1)
+	SetConvarServerInfo("Framework", "Custom ESX")
+	
 	if not CurrentVersion then
 		print('^1GoldenRP Menu Version Check Failed!^7')
 	end

@@ -46,9 +46,9 @@ AddEventHandler('UpdateCooldown', function(newCooldown)
 end)
 
 RegisterNetEvent('UpdatePriority')
-AddEventHandler('UpdatePriority', function(newispriority, name)
+AddEventHandler('UpdatePriority', function(newispriority, playername)
     ispriority = newispriority
-	priorityname = GetPlayerName(GetPlayerPed(-1))
+	playername = playername
 end)
 
 RegisterNetEvent('UpdateHold')
