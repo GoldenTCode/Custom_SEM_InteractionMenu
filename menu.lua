@@ -15,7 +15,6 @@
 local cooldown = 0
 local ispriority = false
 local ishold = false
-local priorityname = GetPlayerName(source)
 
 EnabledUI = false
 EnabledNPUI = true
@@ -46,9 +45,9 @@ AddEventHandler('UpdateCooldown', function(newCooldown)
 end)
 
 RegisterNetEvent('UpdatePriority')
-AddEventHandler('UpdatePriority', function(newispriority, playername)
+AddEventHandler('UpdatePriority', function(newispriority, newpriorityname)
+	priorityname = newpriorityname
     ispriority = newispriority
-	playername = playername
 end)
 
 RegisterNetEvent('UpdateHold')

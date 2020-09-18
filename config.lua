@@ -49,7 +49,7 @@ Config.MenuOrientation = 0
 Config.MenuTitle = 2
 
 --This is the custom title you can set for the menu (If chosen at Config.MenuTitle)
-Config.MenuTitleCustom = 'Change me in config.lua'
+Config.MenuTitleCustom = 'GoldenRP Menu'
 
 
 

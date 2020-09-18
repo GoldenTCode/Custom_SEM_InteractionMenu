@@ -11,14 +11,14 @@ SEM_InteractionMenu was made by Scott1 using NativeUI [LUA] | This version was c
 
 
 ### Information:
-Current Version for Custom Version: **v1.5.2**
+Current Version for Custom Version: **v1.5.3**
 
 Changes: **• Re-Arranged most menus**
 Added: **• Settings Tab, Toggleable UI, Priority Status**
-Fixes: **• Shield not working properly**
-Bugs: **• Priority Status keeps showing the first person that toggled the start prtiority, • Restart the menu if the priority status shows player1.... as the person that is doing priority.**
+Fixes: **• Shield not working properly, • Priority Status is now Fully Functional**
+Bugs: **• No Bugs currently.**
 Options: **• Toggle UI for MY version of the Nearest Postal script, • Toggle UI for MY version of the SpeedLimit script**
-Options Links:
+Requirements to make the Options work:
 **• Link to MY version of the Nearest Postal Script:** [Nearest Postal Script](https://github.com/GoldenTCode/Custom-Nearest-Postal-Script)
 **• Link to MY version of the SpeedLimit Script:** [SpeedLimit Script](https://github.com/GoldenTCode/Custom_Posted_Speed_Limit)
 

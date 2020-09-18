@@ -11,7 +11,7 @@
 	
 ───────────────────────────────────────────────────────────────
 ]]
-
+timermax = 21
 cooldown = 0
 ispriority = false
 ishold = false
@@ -22,10 +22,10 @@ end, false)
 
 RegisterNetEvent('isPriority')
 AddEventHandler('isPriority', function()
-	playername = GetPlayerName(-1)
+	newpriorityname = GetPlayerName(source)
 	ispriority = true
 	Citizen.Wait(1)
-	TriggerClientEvent('UpdatePriority', -1, ispriority)
+	TriggerClientEvent('UpdatePriority', -1, ispriority, newpriorityname)
 end)
 
 RegisterNetEvent('isOnHold')
@@ -49,7 +49,7 @@ AddEventHandler("cooldownt", function()
 	Citizen.Wait(1)
 	if cooldown == 0 then
 		cooldown = 0
-		cooldown = cooldown + 21
+		cooldown = cooldown + timermax
 		while cooldown > 0 do
 			cooldown = cooldown - 1
 			TriggerClientEvent('UpdateCooldown', -1, cooldown)
