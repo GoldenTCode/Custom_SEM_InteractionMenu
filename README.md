@@ -30,7 +30,7 @@ Requirements to make the Options work:
 **• Link to MY version of the SpeedLimit Script:** [SpeedLimit Script](https://github.com/GoldenTCode/Custom_Posted_Speed_Limit)
 
 
-## ALL CREDITS GO TO SCOTT1
+## ALL CREDITS GO TO SCOTT M
 [Original Menu - FiveM](https://forum.cfx.re/t/release-interactionmenu/912635)
 
 [Original Menu - GitHub](https://github.com/Sc0ttM/SEM_InteractionMenu)
