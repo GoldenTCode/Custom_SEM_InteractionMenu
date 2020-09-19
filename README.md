@@ -11,13 +11,19 @@ SEM_InteractionMenu was made by Scott1 using NativeUI [LUA] | This version was c
 
 
 ### Information:
+
 Current Version for Custom Version: **v1.5.3**
 
 Changes: **• Re-Arranged most menus**
+
 Added: **• Settings Tab, • Toggleable UI, • Priority Status**
+
 Fixes: **• Shield not working properly**
+
 Bugs: **• You are required to have ESX to use the commands `/hood` and `/trunk` outside of your vehicle. Trying to find a fix <<**
 
 ## ALL CREDITS GO TO SCOTT1
+
 [Original Menu - FiveM](https://forum.cfx.re/t/release-interactionmenu/912635)
+
 [Original Menu - GitHub](https://github.com/Sc0ttM/SEM_InteractionMenu)
