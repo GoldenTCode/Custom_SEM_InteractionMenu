@@ -1,16 +1,12 @@
---[[
-──────────────────────────────────────────────────────────────
 
-	SEM_InteractionMenu (client.lua) - Created by Scott M
-	Current Version: v1.5.1 (June 2020)
-	
-	Support: https://semdevelopment.com/discord
-	
-		!!! Change vaules in the 'config.lua' !!!
-	DO NOT EDIT THIS IF YOU DON'T KNOW WHAT YOU ARE DOING
+ESX               = nil
 
-──────────────────────────────────────────────────────────────
-]]
+Citizen.CreateThread(function()
+  while ESX == nil do
+    TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
+    Citizen.Wait(0)
+  end
+end)
 
 --Cuffing Event
 RegisterNetEvent('SEM_InteractionMenu:Cuff')
@@ -62,7 +58,213 @@ Citizen.CreateThread(function()
 	end
 end)
 
+--Nearest Postal
+local raw = LoadResourceFile(GetCurrentResourceName(), GetResourceMetadata(GetCurrentResourceName(), 'postal_file'))
+local postals = json.decode(raw)
 
+local nearest = nil
+local pBlip = nil
+
+-- thread for nearest and blip
+Citizen.CreateThread(
+	function()
+		while true do
+			local x, y = table.unpack(GetEntityCoords(GetPlayerPed(-1)))
+
+			local ndm = -1 -- nearest distance magnitude
+			local ni = -1 -- nearest index
+			for i, p in ipairs(postals) do
+				local dm = (x - p.x) ^ 2 + (y - p.y) ^ 2 -- distance magnitude
+				if ndm == -1 or dm < ndm then
+					ni = i
+					ndm = dm
+				end
+			end
+
+			--setting the nearest
+			if ni ~= -1 then
+				local nd = math.sqrt(ndm) -- nearest distance
+				nearest = {i = ni, d = nd}
+			end
+
+			-- if blip exists
+			if pBlip then
+				local b = {x = pBlip.p.x, y = pBlip.p.y} -- blip coords
+				local dm = (b.x - x) ^ 2 + (b.y - y) ^ 2 -- distance magnitude
+				if dm < config.blip.distToDelete ^ 2 then
+					-- delete blip if close
+					RemoveBlip(pBlip.hndl)
+					pBlip = nil
+				end
+			end
+
+			Wait(100)
+		end
+	end
+)
+
+IsHudHidden = false
+DisplayLocation = true
+
+Citizen.CreateThread(
+	function()
+		while true do
+			if nearest and IsHudHidden == false then
+				local text = config.text.format:format(postals[nearest.i].code, nearest.d)
+				SetTextScale(0.46, 0.46)
+				SetTextFont(4)
+				SetTextOutline()
+				BeginTextCommandDisplayText('STRING')
+				AddTextComponentSubstringPlayerName(text)
+				EndTextCommandDisplayText(config.text.posX, config.text.posY)
+			end
+			Wait(0)
+		end
+	end
+)
+AddEventHandler("hidenearestpostalhud", function(hide)
+    IsHudHidden = true
+end)
+AddEventHandler("shownearestpostalhud", function(show)
+    IsHudHidden = false
+end)
+
+RegisterCommand(
+	'postal',
+	function(source, args, raw)
+		if #args < 1 then
+			if pBlip then
+				RemoveBlip(pBlip.hndl)
+				pBlip = nil
+				TriggerEvent(
+					'chat:addMessage',
+					{
+						color = {255, 0, 0},
+						args = {
+							'Postals',
+							config.blip.deleteText
+						}
+					}
+				)
+			end
+			return
+		end
+		local n = string.upper(args[1])
+
+		local fp = nil
+		for _, p in ipairs(postals) do
+			if string.upper(p.code) == n then
+				fp = p
+			end
+		end
+
+		if fp then
+			if pBlip then
+				RemoveBlip(pBlip.hndl)
+			end
+			pBlip = {hndl = AddBlipForCoord(fp.x, fp.y, 0.0), p = fp}
+			SetBlipRoute(pBlip.hndl, true)
+			SetBlipSprite(pBlip.hndl, config.blip.sprite)
+			SetBlipColour(pBlip.hndl, config.blip.color)
+			SetBlipRouteColour(pBlip.hndl, config.blip.color)
+			BeginTextCommandSetBlipName('STRING')
+			AddTextComponentSubstringPlayerName(config.blip.blipText:format(pBlip.p.code))
+			EndTextCommandSetBlipName(pBlip.hndl)
+
+			TriggerEvent(
+				'chat:addMessage',
+				{
+					color = {255, 0, 0},
+					args = {
+						'Postals',
+						config.blip.drawRouteText:format(fp.code)
+					}
+				}
+			)
+		else
+			TriggerEvent(
+				'chat:addMessage',
+				{
+					color = {255, 0, 0},
+					args = {
+						'Postals',
+						config.blip.notExistText
+					}
+				}
+			)
+		end
+	end
+)
+
+local dev = false
+if dev then
+	local devLocal = json.decode(raw)
+	local next = 0
+
+	RegisterCommand(
+		'setnext',
+		function(src, args, raw)
+			local n = tonumber(args[1])
+			if n ~= nil then
+				next = n
+				print('next ' .. next)
+				return
+			end
+			print('invalid ' .. n)
+		end
+	)
+	RegisterCommand(
+		'next',
+		function(src, args, raw)
+			for i, d in ipairs(devLocal) do
+				if d.code == tostring(next) then
+					print('duplicate ' .. next)
+					return
+				end
+			end
+			local coords = GetEntityCoords(GetPlayerPed(-1))
+			table.insert(devLocal, {code = tostring(next), x = coords.x, y = coords.y})
+			print('insert ' .. next)
+			next = next + 1
+		end
+	)
+	RegisterCommand(
+		'rl',
+		function(src, args, raw)
+			if #devLocal > 0 then
+				local data = table.remove(devLocal, #devLocal)
+				print('remove ' .. data.code)
+				print('next ' .. next)
+				next = next - 1
+			else
+				print('invalid')
+			end
+		end
+	)
+	RegisterCommand(
+		'remove',
+		function(src, args, raw)
+			if #args < 1 then
+				print('invalid')
+			else
+				for i, d in ipairs(devLocal) do
+					if d.code == args[1] then
+						table.remove(devLocal, i)
+						print('remove ' .. d.code)
+						return
+					end
+				end
+				print('invalid')
+			end
+		end
+	)
+	RegisterCommand(
+		'json',
+		function(src, args, raw)
+			print(json.encode(devLocal))
+		end
+	)
+end
 
 --Dragging Event
 local Drag = false
@@ -260,159 +462,6 @@ end
 
 
 
---Backup
-RegisterNetEvent('SEM_InteractionMenu:CallBackup')
-AddEventHandler('SEM_InteractionMenu:CallBackup', function(Code, StreetName, Coords)
-    if LEORestrict() then
-        local BackupBlip = nil
-        local BackupBlips = {}
-
-        local function CreateBlip(x, y, z, Name, Sprite, Size, Colour)
-            BackupBlip = AddBlipForCoord(x, y, z)
-            SetBlipSprite(BackupBlip, Sprite)
-            SetBlipDisplay(BackupBlip, 4)
-            SetBlipScale(BackupBlip, Size)
-            SetBlipColour(BackupBlip, Colour)
-            SetBlipAsShortRange(BackupBlip, true)
-        
-            BeginTextCommandSetBlipName('STRING')
-            AddTextComponentString(Name)
-            EndTextCommandSetBlipName(BackupBlip)
-            table.insert(BackupBlips, BackupBlip)
-            Citizen.Wait(Config.BackupBlipTimeout * 60000)
-            for _, Blip in pairs(BackupBlips) do
-                RemoveBlip(Blip)
-            end
-        end
-
-        if Code == 1 then
-            Notify('An officer is requesting ~g~Code 1 ~w~backup at ~b~' .. StreetName)
-            CreateBlip(Coords.x, Coords.y, Coords.z, 'Code 1 Backup Requested', 56, 0.8, 2)
-        elseif Code == 2 then
-            Notify('An officer is requesting ~y~Code 2 ~w~backup at ~b~' .. StreetName)
-            CreateBlip(Coords.x, Coords.y, Coords.z, 'Code 2 Backup Requested', 56, 0.8, 17)
-        elseif Code == 3 then
-            Notify('An officer is requesting ~r~Code 3 ~w~backup at ~b~' .. StreetName)
-            CreateBlip(Coords.x, Coords.y, Coords.z, 'Code 3 Backup Requested', 56, 1.0, 49)
-        elseif Code == 99 then
-            Notify('An officer is requesting ~r~Code 99 ~w~backup at ~b~' .. StreetName)
-            CreateBlip(Coords.x, Coords.y, Coords.z, 'Code 99 Backup Requested', 56, 1.2, 49)
-        elseif Code == 'panic' then
-            Notify('An officer has pressed their ~r~Panic Button ~w~at ~b~' .. StreetName)
-            CreateBlip(Coords.x, Coords.y, Coords.z, 'Panic Button Pressed', 103, 1.2, 49)
-        end
-    end
-end)
-
-
-
---Jail
-CurrentlyJailed = false
-EarlyRelease = false
-OriginalJailTime = 0
-RegisterNetEvent('SEM_InteractionMenu:JailPlayer')
-AddEventHandler('SEM_InteractionMenu:JailPlayer', function(JailTime)
-    if CurrentlyJailed then
-        return
-    end
-    if CurrentlyHospitaled then
-        return
-    end
-
-    OriginalJailTime = JailTime
-
-    local Ped = GetPlayerPed(-1)
-    if DoesEntityExist(Ped) then
-        Citizen.CreateThread(function()
-            SetEntityCoords(Ped, Config.JailLocation.Jail.x, Config.JailLocation.Jail.y, Config.JailLocation.Jail.z)
-            SetEntityHeading(Ped, Config.JailLocation.Jail.h)
-            CurrentlyJailed = true
-
-            while JailTime >= 0 and not EarlyRelease do
-                SetEntityInvincible(Ped, true)
-                if IsPedInAnyVehicle(Player, false) then
-					ClearPedTasksImmediately(Player)
-                end
-                
-                if JailTime % 30 == 0 and JailTime ~= 0 then
-                    TriggerEvent('chat:addMessage', {
-                        multiline = true,
-                        color = {86, 96, 252},
-                        args = {'GOLDENRP', JailTime .. ' seconds until release.'},
-                    })
-				end
-
-                Citizen.Wait(1000)
-
-                local Location = GetEntityCoords(Ped, true)
-				local Distance = Vdist(Config.JailLocation.Jail.x, Config.JailLocation.Jail.y, Config.JailLocation.Jail.z, Location['x'], Location['y'], Location['z'])
-				if Distance > 100 then
-                    SetEntityCoords(Ped, Config.JailLocation.Jail.x, Config.JailLocation.Jail.y, Config.JailLocation.Jail.z)
-                    SetEntityHeading(Ped, Config.JailLocation.Jail.h)
-					TriggerEvent('chat:addMessage', {
-                        multiline = true,
-                        color = {86, 96, 252},
-                        args = {'GOLDENRP', 'Don\'t try escape, its impossible'},
-                    })
-				end
-
-                JailTime = JailTime - 1
-            end
-
-            if EarlyRelease then
-                TriggerServerEvent('SEM_InteractionMenu:GlobalChat', {86, 96, 252}, 'GOLDENRP', GetPlayerName(PlayerId()) .. ' was released from Jail on Parole')
-            else
-                TriggerServerEvent('SEM_InteractionMenu:GlobalChat', {86, 96, 252}, 'GOLDENRP', GetPlayerName(PlayerId()) .. ' was released from Jail after ' .. OriginalJailTime .. ' second(s).')
-            end
-            SetEntityCoords(Ped, Config.JailLocation.Release.x, Config.JailLocation.Release.y, Config.JailLocation.Release.z)
-            SetEntityHeading(Ped, Config.JailLocation.Release.h)
-            CurrentlyJailed = false
-            EarlyRelease = false
-        end)
-    end
-end)
-
-RegisterNetEvent('SEM_InteractionMenu:UnjailPlayer')
-AddEventHandler('SEM_InteractionMenu:UnjailPlayer', function()
-    EarlyRelease = true
-end)
-
-
-
---Toggle LEO Weapons
-CarbineEquipped = false
-ShotgunEquipped = false
-Citizen.CreateThread(function()
-    local Ped = GetPlayerPed(-1)
-    while true do 
-        Citizen.Wait(0)
-        local Ped = GetPlayerPed(-1)
-        local Veh = GetVehiclePedIsIn(Ped)
-        local CurrentWeapon = GetSelectedPedWeapon(Ped)
-        
-        if Config.UnrackWeapons then
-            if CarbineEquipped then
-                SetCurrentPedWeapon(Ped, 'weapon_carbinerifle', true)
-            else
-                if (tostring(CurrentWeapon) == '-2084633992') then
-                    Notify('~o~You need to unrack your rifle before you can use it')
-                    SetCurrentPedWeapon(Ped, 'weapon_unarmed', true)
-                end
-            end
-            
-            if ShotgunEquipped then
-                SetCurrentPedWeapon(Ped, 'weapon_pumpshotgun', true)
-            else
-                if tostring(CurrentWeapon) == '487013001' then
-                    Notify('~o~You need to unrack your shotgun before you can use it')
-                    SetCurrentPedWeapon(Ped, 'weapon_unarmed', true)
-                end
-            end
-        end
-    end
-end)
-
-
 
 --Object Spawn Event
 RegisterNetEvent('SEM_InteractionMenu:Object:SpawnObjects')
@@ -476,181 +525,8 @@ end)
 
 
 
-
---Hospital
-CurrentlyHospitalized = false
-EarlyDischarge = false
-OriginalHospitalTime = 0
-RegisterNetEvent('SEM_InteractionMenu:HospitalizePlayer')
-AddEventHandler('SEM_InteractionMenu:HospitalizePlayer', function(HospitalTime, HospitalLocation)
-    if CurrentlyHospitaled then
-        return
-    end
-    if CurrentlyJailed then
-        return
-    end
-
-    OriginalHospitalTime = HospitalTime
-
-    local Ped = GetPlayerPed(-1)
-    if DoesEntityExist(Ped) then
-        Citizen.CreateThread(function()
-            SetEntityCoords(Ped, HospitalLocation.Hospital.x, HospitalLocation.Hospital.y, HospitalLocation.Hospital.z)
-            SetEntityHeading(Ped, HospitalLocation.Hospital.h)
-            CurrentlyHospitaled = true
-
-            while HospitalTime >= 0 and not EarlyDischarge do
-                SetEntityInvincible(Ped, true)
-                if IsPedInAnyVehicle(Player, false) then
-					ClearPedTasksImmediately(Player)
-                end
-                
-                if HospitalTime % 30 == 0 and HospitalTime ~= 0 then
-                    TriggerEvent('chat:addMessage', {
-                        multiline = true,
-                        color = {86, 96, 252},
-                        args = {'Doctor', HospitalTime .. ' seconds until release.'},
-                    })
-				end
-
-                Citizen.Wait(1000)
-
-                local Location = GetEntityCoords(Ped, true)
-                local Distance = Vdist(HospitalLocation.Hospital.x, HospitalLocation.Hospital.y, HospitalLocation.Hospital.z, Location['x'], Location['y'], Location['z'])
-				if Distance > 30 then
-                    SetEntityCoords(Ped, HospitalLocation.Hospital.x, HospitalLocation.Hospital.y, HospitalLocation.Hospital.z)
-                    SetEntityHeading(Ped, HospitalLocation.Hospital.h)
-					TriggerEvent('chat:addMessage', {
-                        multiline = true,
-                        color = {86, 96, 252},
-                        args = {'Doctor', 'You cannot discharge yourself!'},
-                    })
-				end
-
-                HospitalTime = HospitalTime - 1
-            end
-
-            if EarlyDischarge then
-                TriggerServerEvent('SEM_InteractionMenu:GlobalChat', {86, 96, 252}, 'Doctor', GetPlayerName(PlayerId()) .. ' was discharged from Hospital early')
-            else
-                TriggerServerEvent('SEM_InteractionMenu:GlobalChat', {86, 96, 252}, 'Doctor', GetPlayerName(PlayerId()) .. ' was discharged from Hospital after ' .. OriginalHospitalTime .. ' second(s).')
-            end
-            SetEntityCoords(Ped, HospitalLocation.Release.x, HospitalLocation.Release.y, HospitalLocation.Release.z)
-            SetEntityHeading(Ped, HospitalLocation.Release.h)
-            CurrentlyHospitaled = false
-            EarlyDischarge = false
-        end)
-    end
-end)
-
-RegisterNetEvent('SEM_InteractionMenu:UnhospitalizePlayer')
-AddEventHandler('SEM_InteractionMenu:UnhospitalizePlayer', function()
-    EarlyDischarge = true
-end)
-
-
-
---Station Blips
-Citizen.CreateThread(function()
-    if Config.DisplayStationBlips then
-        local function CreateBlip(x, y, z, Name, Colour, Sprite)
-            StationBlip = AddBlipForCoord(x, y, z)
-            SetBlipSprite(StationBlip, Sprite)
-            if Config.StationBlipsDispalyed == 1 then
-                SetBlipDisplay(StationBlip, 3)
-            elseif Config.StationBlipsDispalyed == 2 then
-                SetBlipDisplay(StationBlip, 5)
-            else
-                SetBlipDisplay(StationBlip, 2)
-            end
-            SetBlipScale(StationBlip, 1.0)
-            SetBlipColour(StationBlip, Colour)
-            SetBlipAsShortRange(StationBlip, true)
-        
-            BeginTextCommandSetBlipName('STRING')
-            AddTextComponentString(Name)
-            EndTextCommandSetBlipName(StationBlip)
-        end
-
-        for _, Station in pairs(Config.LEOStations) do
-            CreateBlip(Station.coords.x, Station.coords.y, Station.coords.z, 'Police Station', 38, 60)
-        end
-        for _, Station in pairs(Config.FireStations) do
-            CreateBlip(Station.coords.x, Station.coords.y, Station.coords.z, 'Fire Station', 1, 60)
-        end
-        for _, Station in pairs(Config.HospitalStations) do
-            CreateBlip(Station.coords.x, Station.coords.y, Station.coords.z, 'Hospital', 2, 61)
-        end
-    end
-end)
-
-
-
---Permissions
-LEOAce = false
-TriggerServerEvent('SEM_InteractionMenu:LEOPerms')
-RegisterNetEvent('SEM_InteractionMenu:LEOPermsResult')
-AddEventHandler('SEM_InteractionMenu:LEOPermsResult', function(Allowed)
-    if Allowed then
-        LEOAce = true
-    else
-        LEOAce = false
-    end
-end)
-
-FireAce = false
-TriggerServerEvent('SEM_InteractionMenu:FirePerms')
-RegisterNetEvent('SEM_InteractionMenu:FirePermsResult')
-AddEventHandler('SEM_InteractionMenu:FirePermsResult', function(Allowed)
-    if Allowed then
-        FireAce = true
-    else
-        FireAce = false
-    end
-end)
-
-
-
---Emote
-Citizen.CreateThread(function()
-    while true do
-        if EmotePlaying then
-            if Config.EmoteHelp then
-                NotifyHelp('You are playing an Emote, ~b~Move to Cancel')
-            end
-
-            --  Spacebar                   W                          S                          A                          D
-            if (IsControlPressed(0, 22) or IsControlPressed(0, 32) or IsControlPressed(0, 33) or IsControlPressed(0, 34) or IsControlPressed(0, 35)) then
-                CancelEmote()
-            end
-        end
-        Citizen.Wait(0)
-    end
-end)
-
-
-
 --Commands
 Citizen.CreateThread(function()
-    if EmoteRestrict() then
-        local Index = 0
-        local Emotes = ''
-        for _, Emote in pairs(Config.EmotesList) do
-            Index = Index + 1
-            if Index == 1 then
-                Emotes = Emotes .. Emote.name
-            else
-                Emotes = Emotes .. ', ' .. Emote.name
-            end
-        end
-        
-        TriggerEvent('chat:addSuggestion', '/emotes', 'List of Current Avaliable Emotes')
-        TriggerEvent('chat:addSuggestion', '/emote', 'Play Emote', {{name = 'Emote Name', help = 'Emotes: ' .. Emotes}})
-    else
-        TriggerEvent('chat:removeSuggestion', '/emotes')
-        TriggerEvent('chat:removeSuggestion', '/emote')
-    end
-
     TriggerEvent('chat:addSuggestion', '/eng', 'Toggles Engine')
     TriggerEvent('chat:addSuggestion', '/hood', 'Toggles Vehicle\'s Hood')
     TriggerEvent('chat:addSuggestion', '/trunk', 'Toggles Vehicle\'s Trunk')
@@ -658,69 +534,6 @@ Citizen.CreateThread(function()
     TriggerEvent('chat:addSuggestion', '/cuff', 'Cuff Player', {{name = 'ID', help = 'Players Server ID'}})
     TriggerEvent('chat:addSuggestion', '/drag', 'Drag Player', {{name = 'ID', help = 'Players Server ID'}})
     TriggerEvent('chat:addSuggestion', '/dropweapon', 'Drops Weapon in Hand')
-    TriggerEvent('chat:addSuggestion', '/loadout', 'Equips LEO Weapon Loadout')
-    TriggerEvent('chat:addSuggestion', '/coords', 'Shows Current Player Coords and Heading')
-
-
-    if Config.LEOAccess == 3 or Config.FireAccess == 3 then
-        if Config.OndutyPSWDActive then
-            TriggerEvent('chat:addSuggestion', '/onduty', 'Enable LEO/Fire Menu', {{name = 'Department', help = 'LEO or Fire'}, {name = 'Password', help = 'Onduty Password'}})
-        else
-            TriggerEvent('chat:addSuggestion', '/onduty', 'Enable LEO/Fire Menu', {{name = 'Department', help = 'LEO or Fire'}})
-        end
-    else
-        TriggerEvent('chat:removeSuggestion', '/onduty')
-    end
-end)
-
-LEOOnduty = false
-FireOnduty = false
-RegisterCommand('onduty', function(source, args, rawCommand)
-    if Config.LEOAccess == 3 or Config.FireAccess == 3 then
-        if Config.OndutyPSWDActive then
-            if args[2] == Config.OndutyPSWD then
-                local Department = args[1]:lower()
-                if Department == 'leo' then
-                    LEOOnduty = not LEOOnduty
-                    if LEOOnduty then
-                        Notify('~g~You are onduty as an LEO')
-                    else
-                        Notify('~o~You are no longer onduty as an LEO')
-                    end
-                elseif Department == 'fire' then
-                    FireOnduty = not FireOnduty
-                    if FireOnduty == true then
-                        Notify('~g~You are onduty as an Firefighter')
-                    else
-                        Notify('~o~You are no longer onduty as an Firefighter')
-                    end
-                else
-                    Notify('~r~Invalid Department!')
-                end
-            else
-                Notify('~r~Incorrect Password')
-            end
-        else
-            local Department = args[1]:lower()
-            if Department == 'leo' then
-                LEOOnduty = not LEOOnduty
-                if LEOOnduty then
-                    Notify('~g~You are onduty as an LEO')
-                else
-                    Notify('~o~You are no longer onduty as an LEO')
-                end
-            elseif Department == 'fire' then
-                FireOnduty = not FireOnduty
-                if FireOnduty == true then
-                    Notify('~g~You are onduty as an Firefighter')
-                else
-                    Notify('~o~You are no longer onduty as an Firefighter')
-                end
-            else
-                Notify('~r~Invalid Department!')
-            end
-        end
-    end
 end)
 
 RegisterCommand('cuff', function(source, args, rawCommand)
@@ -765,74 +578,6 @@ RegisterCommand('drag', function(source, args, rawCommand)
     end
 end)
 
-RegisterCommand('unjail', function(source, args, rawCommand)
-    if args[1] ~= nil then
-        if args[2] == Config.UnjailPSWD then
-            TriggerServerEvent('SEM_InteractionMenu:Unjail', args[1])
-            Notify('~g~Releasing player...')
-        end
-    end
-end)
-
-RegisterCommand('unhospital', function(source, args, rawCommand)
-    if args[1] ~= nil then
-        if args[2] == Config.HospitalPSWD then
-            TriggerServerEvent('SEM_InteractionMenu:Unhospitalize', args[1])
-            Notify('~g~Releasing player...')
-        end
-    end
-end)
-
-RegisterCommand('loadout', function(source, args, rawCommand)
-    if LEORestrict() then
-        SetEntityHealth(GetPlayerPed(-1), 200)
-        RemoveAllPedWeapons(GetPlayerPed(-1), true)
-        AddArmourToPed(GetPlayerPed(-1), 100)
-        GiveWeapon('weapon_nightstick')
-        GiveWeapon('weapon_flashlight')
-        GiveWeapon('weapon_fireextinguisher')
-        GiveWeapon('weapon_flare')
-        GiveWeapon('weapon_stungun')
-        GiveWeapon('weapon_combatpistol')
-        AddWeaponComponent('weapon_combatpistol', 'component_at_pi_flsh')
-        Notify('~g~Loadout Spawned')
-    else
-        Notify('~r~You aren\'t an LEO')
-    end
-end)
-
-RegisterCommand('hu', function(source, args, rawCommand)
-    local Ped = PlayerPedId()
-    if DoesEntityExist(Ped) and not HandCuffed then
-        Citizen.CreateThread(function()
-            LoadAnimation('random@mugging3')
-            if IsEntityPlayingAnim(Ped, 'random@mugging3', 'handsup_standing_base', 3) or HandCuffed then
-                ClearPedSecondaryTask(Ped)
-                SetEnableHandcuffs(Ped, false)
-            elseif not IsEntityPlayingAnim(Ped, 'random@mugging3', 'handsup_standing_base', 3) or not HandCuffed then
-                TaskPlayAnim(Ped, 'random@mugging3', 'handsup_standing_base', 8.0, -8, -1, 49, 0, 0, 0, 0)
-                SetEnableHandcuffs(Ped, true)
-            end
-        end)
-    end
-end)
-
-RegisterCommand('huk', function(source, args, rawCommand)
-    local Ped = PlayerPedId()
-    if (DoesEntityExist(Ped) and not IsEntityDead(Ped)) and not HandCuffed then
-        Citizen.CreateThread(function()
-            LoadAnimation('random@arrests')
-            if (IsEntityPlayingAnim(Ped, 'random@arrests', 'kneeling_arrest_idle', 3)) then
-                TaskPlayAnim(Ped, 'random@arrests', 'kneeling_arrest_get_up', 8.0, 1.0, -1, 128, 0, 0, 0, 0)
-            else
-                TaskPlayAnim(Ped, 'random@arrests', 'idle_2_hands_up', 8.0, 1.0, -1, 2, 0, 0, 0, 0)
-                Wait (4000)
-                TaskPlayAnim(Ped, 'random@arrests', 'kneeling_arrest_idle', 8.0, 1.0, -1, 2, 0, 0, 0, 0)
-            end
-        end)
-    end
-end)
-
 RegisterCommand('dropweapon', function(source, args, rawCommand)
     local CurrentWeapon = GetSelectedPedWeapon(GetPlayerPed(-1))
     SetPedDropsInventoryWeapon(GetPlayerPed(-1), CurrentWeapon, -2.0, 0.0, 0.5, 30)
@@ -855,75 +600,833 @@ end)
 
 RegisterCommand('hood', function(source, args, rawCommand)
     local Veh = GetVehiclePedIsIn(PlayerPedId(), false)
-
+	local player = source
+    local ped = GetPlayerPed(player)
+    local playerCoords = GetEntityCoords(ped)
+	local nearVeh = ESX.Game.GetClosestVehicle(playerCoords)
+	
     if Veh ~= nil and Veh ~= 0 and Veh ~= 1 then
         if GetVehicleDoorAngleRatio(Veh, 4) > 0 then
             SetVehicleDoorShut(Veh, 4, false)
         else
             SetVehicleDoorOpen(Veh, 4, false, false)
         end
-    end
-
-    Notify('~g~Hood Toggled!')
+	else
+		if GetVehicleDoorAngleRatio(nearVeh, 4) > 0 then
+			SetVehicleDoorShut(nearVeh, 4, false)
+        else
+            SetVehicleDoorOpen(nearVeh, 4, false, false)
+		end
+	end
+	Notify('~g~Hood Toggled!')
 end)
 
 RegisterCommand('trunk', function(source, args, rawCommand)
     local Veh = GetVehiclePedIsIn(PlayerPedId(), false)
+	local player = source
+    local ped = GetPlayerPed(player)
+    local playerCoords = GetEntityCoords(ped)
+	local nearVeh = ESX.Game.GetClosestVehicle(playerCoords)
 
     if Veh ~= nil and Veh ~= 0 and Veh ~= 1 then
         if GetVehicleDoorAngleRatio(Veh, 5) > 0 then
             SetVehicleDoorShut(Veh, 5, false)
         else
             SetVehicleDoorOpen(Veh, 5, false, false)
-        end
-    end
-
-    Notify('~g~Trunk Toggled!')
+		end
+	else
+		if GetVehicleDoorAngleRatio(nearVeh, 5) > 0 then
+			SetVehicleDoorShut(nearVeh, 5, false)
+        else
+            SetVehicleDoorOpen(nearVeh, 5, false, false)
+		end
+	end
+		Notify('~g~Trunk Toggled!')
 end)
 
-RegisterCommand('emotes', function(source, args, rawCommand)
-    if EmoteRestrict() then
-        local Index = 0
-        local Emotes = ''
-        for _, Emote in pairs(Config.EmotesList) do
-            Index = Index + 1
-            if Index == 1 then
-                Emotes = Emotes .. Emote.name
+--SpeedLimit
+local speedlimit = "~r~~h~You havent added this street!"
+
+AddEventHandler("hidespeedlimithud", function(hide)
+    speedlimitshow = false
+end)
+AddEventHandler("showspeedlimithud", function(show)
+    speedlimitshow = true
+end)
+
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(0)
+        local playerloc = GetEntityCoords(GetPlayerPed(-1))
+        local streethash = GetStreetNameAtCoord(playerloc.x, playerloc.y, playerloc.z)
+        street = GetStreetNameFromHashKey(streethash)
+
+    if IsPedInAnyVehicle(GetPlayerPed(-1)) and not IsPedInAnyBoat(GetPlayerPed(-1)) and not IsPedInAnyHeli(GetPlayerPed(-1)) and not IsPedInAnyPlane(GetPlayerPed(-1)) then
+            if street == "Joshua Rd" then
+                speedlimit = 50
+            elseif street == "East Joshua Road" then
+                speedlimit = 50
+            elseif street == "Marina Dr" then
+                speedlimit = 35
+            elseif street == "Alhambra Dr" then
+                speedlimit = 35
+            elseif street == "Niland Ave" then
+                speedlimit = 35
+            elseif street == "Zancudo Ave" then
+                speedlimit = 35
+            elseif street == "Armadillo Ave" then
+                speedlimit = 35
+            elseif street == "Algonquin Blvd" then
+                speedlimit = 35
+            elseif street == "Mountain View Dr" then
+                speedlimit = 35
+            elseif street == "Cholla Springs Ave" then
+                speedlimit = 35
+            elseif street == "Panorama Dr" then
+                speedlimit = 40
+            elseif street == "Lesbos Ln" then
+                speedlimit = 35
+            elseif street == "Calafia Rd" then
+                speedlimit = 30
+            elseif street == "North Calafia Way" then
+                speedlimit = 30
+            elseif street == "Cassidy Trail" then
+                speedlimit = 25
+            elseif street == "Seaview Rd" then
+                speedlimit = 35
+            elseif street == "Grapeseed Main St" then
+                speedlimit = 35
+            elseif street == "Grapeseed Ave" then
+                speedlimit = 35
+            elseif street == "Joad Ln" then
+                speedlimit = 35
+            elseif street == "Union Rd" then
+                speedlimit = 40
+            elseif street == "O'Neil Way" then
+                speedlimit = 25
+            elseif street == "Senora Fwy" then
+                speedlimit = 65
+            elseif street == "Catfish View" then
+                speedlimit = 35
+            elseif street == "Great Ocean Hwy" then
+                speedlimit = 60
+            elseif street == "Paleto Blvd" then
+                speedlimit = 35
+            elseif street == "Duluoz Ave" then
+                speedlimit = 35
+            elseif street == "Procopio Dr" then
+                speedlimit = 35
+            elseif street == "Cascabel Ave" then
+                speedlimit = 30
+            elseif street == "Procopio Promenade" then
+                speedlimit = 25
+            elseif street == "Pyrite Ave" then
+                speedlimit = 30
+            elseif street == "Fort Zancudo Approach Rd" then
+                speedlimit = 25
+            elseif street == "Barbareno Rd" then
+                speedlimit = 30
+            elseif street == "Ineseno Road" then
+                speedlimit = 30
+            elseif street == "West Eclipse Blvd" then
+                speedlimit = 35
+            elseif street == "Playa Vista" then
+                speedlimit = 30
+            elseif street == "Bay City Ave" then
+                speedlimit = 30
+            elseif street == "Del Perro Fwy" then
+                speedlimit = 65
+            elseif street == "Equality Way" then
+                speedlimit = 30
+            elseif street == "Red Desert Ave" then
+                speedlimit = 30
+            elseif street == "Magellan Ave" then
+                speedlimit = 25
+            elseif street == "Sandcastle Way" then
+                speedlimit = 30
+            elseif street == "Vespucci Blvd" then
+                speedlimit = 40
+            elseif street == "Prosperity St" then
+                speedlimit = 30
+            elseif street == "San Andreas Ave" then
+                speedlimit = 40
+            elseif street == "North Rockford Dr" then
+                speedlimit = 35
+            elseif street == "South Rockford Dr" then
+                speedlimit = 35
+            elseif street == "Marathon Ave" then
+                speedlimit = 30
+            elseif street == "Boulevard Del Perro" then
+                speedlimit = 35
+            elseif street == "Cougar Ave" then
+                speedlimit = 30
+            elseif street == "Liberty St" then
+                speedlimit = 30
+            elseif street == "Bay City Incline" then
+                speedlimit = 40
+            elseif street == "Conquistador St" then
+                speedlimit = 25
+            elseif street == "Cortes St" then
+                speedlimit = 25
+            elseif street == "Vitus St" then
+                speedlimit = 25
+            elseif street == "Aguja St" then
+                speedlimit = 25
+            elseif street == "Goma St" then
+                speedlimit = 25
+            elseif street == "Melanoma St" then
+                speedlimit = 25
+            elseif street == "Palomino Ave" then
+                speedlimit = 35
+            elseif street == "Invention Ct" then
+                speedlimit = 25
+            elseif street == "Imagination Ct" then
+                speedlimit = 25
+            elseif street == "Rub St" then
+                speedlimit = 25
+            elseif street == "Tug St" then
+                speedlimit = 25
+            elseif street == "Ginger St" then
+                speedlimit = 30
+            elseif street == "Lindsay Circus" then
+                speedlimit = 30
+            elseif street == "Calais Ave" then
+                speedlimit = 35
+            elseif street == "Adam's Apple Blvd" then
+                speedlimit = 40
+            elseif street == "Alta St" then
+                speedlimit = 40
+            elseif street == "Integrity Way" then
+                speedlimit = 30
+            elseif street == "Swiss St" then
+                speedlimit = 30
+            elseif street == "Strawberry Ave" then
+                speedlimit = 40
+            elseif street == "Capital Blvd" then
+                speedlimit = 30
+            elseif street == "Crusade Rd" then
+                speedlimit = 30
+            elseif street == "Innocence Blvd" then
+                speedlimit = 40
+            elseif street == "Davis Ave" then
+                speedlimit = 40
+            elseif street == "Little Bighorn Ave" then
+                speedlimit = 35
+            elseif street == "Roy Lowenstein Blvd" then
+                speedlimit = 35
+            elseif street == "Jamestown St" then
+                speedlimit = 30
+            elseif street == "Carson Ave" then
+                speedlimit = 35
+            elseif street == "Grove St" then
+                speedlimit = 30
+            elseif street == "Brouge Ave" then
+                speedlimit = 30
+            elseif street == "Covenant Ave" then
+                speedlimit = 30
+            elseif street == "Dutch London St" then
+                speedlimit = 40
+            elseif street == "Signal St" then
+                speedlimit = 30
+            elseif street == "Elysian Fields Fwy" then
+                speedlimit = 50
+            elseif street == "Plaice Pl" then
+                speedlimit = 30
+            elseif street == "Chum St" then
+                speedlimit = 40
+            elseif street == "Chupacabra St" then
+                speedlimit = 30
+            elseif street == "Miriam Turner Overpass" then
+                speedlimit = 30
+            elseif street == "Autopia Pkwy" then
+                speedlimit = 35
+            elseif street == "Exceptionalists Way" then
+                speedlimit = 35
+            elseif street == "La Puerta Fwy" then
+                speedlimit = 60
+            elseif street == "New Empire Way" then
+                speedlimit = 30
+            elseif street == "Runway1" then
+                speedlimit = "--"
+            elseif street == "Greenwich Pkwy" then
+                speedlimit = 35
+            elseif street == "Kortz Dr" then
+                speedlimit = 30
+            elseif street == "Banham Canyon Dr" then
+                speedlimit = 40
+            elseif street == "Buen Vino Rd" then
+                speedlimit = 40
+            elseif street == "Route 68" then
+                speedlimit = 55
+            elseif street == "Zancudo Grande Valley" then
+                speedlimit = 40
+            elseif street == "Zancudo Barranca" then
+                speedlimit = 40
+            elseif street == "Galileo Rd" then
+                speedlimit = 40
+            elseif street == "Mt Vinewood Dr" then
+                speedlimit = 40
+            elseif street == "Marlowe Dr" then
+                speedlimit = 40
+            elseif street == "Milton Rd" then
+                speedlimit = 35
+            elseif street == "Kimble Hill Dr" then
+                speedlimit = 35
+            elseif street == "Normandy Dr" then
+                speedlimit = 35
+            elseif street == "Hillcrest Ave" then
+                speedlimit = 35
+            elseif street == "Hillcrest Ridge Access Rd" then
+                speedlimit = 35
+            elseif street == "North Sheldon Ave" then
+                speedlimit = 35
+            elseif street == "Lake Vinewood Dr" then
+                speedlimit = 35
+            elseif street == "Lake Vinewood Est" then
+                speedlimit = 35
+            elseif street == "Baytree Canyon Rd" then
+                speedlimit = 40
+            elseif street == "North Conker Ave" then
+                speedlimit = 35
+            elseif street == "Wild Oats Dr" then
+                speedlimit = 35
+            elseif street == "Whispymound Dr" then
+                speedlimit = 35
+            elseif street == "Didion Dr" then
+                speedlimit = 35
+            elseif street == "Cox Way" then
+                speedlimit = 35
+            elseif street == "Picture Perfect Drive" then
+                speedlimit = 35
+            elseif street == "South Mo Milton Dr" then
+                speedlimit = 35
+            elseif street == "Cockingend Dr" then
+                speedlimit = 35
+            elseif street == "Mad Wayne Thunder Dr" then
+                speedlimit = 35
+            elseif street == "Hangman Ave" then
+                speedlimit = 35
+            elseif street == "Dunstable Ln" then
+                speedlimit = 35
+            elseif street == "Dunstable Dr" then
+                speedlimit = 35
+            elseif street == "Greenwich Way" then
+                speedlimit = 35
+            elseif street == "Greenwich Pl" then
+                speedlimit = 35
+            elseif street == "Hardy Way" then
+                speedlimit = 35
+            elseif street == "Richman St" then
+                speedlimit = 35
+            elseif street == "Ace Jones Dr" then
+                speedlimit = 35
+            elseif street == "Los Santos Freeway" then
+                speedlimit = 65
+            elseif street == "Senora Rd" then
+                speedlimit = 40
+            elseif street == "Nowhere Rd" then
+                speedlimit = 25
+            elseif street == "Smoke Tree Rd" then
+                speedlimit = 35
+            elseif street == "Cholla Rd" then
+                speedlimit = 35
+            elseif street == "Cat-Claw Ave" then
+                speedlimit = 35
+            elseif street == "Senora Way" then
+                speedlimit = 40
+            elseif street == "Palomino Fwy" then
+                speedlimit = 60
+            elseif street == "Shank St" then
+                speedlimit = 25
+            elseif street == "Macdonald St" then
+                speedlimit = 35
+            elseif street == "Route 68 Approach" then
+                speedlimit = 55
+            elseif street == "Vinewood Park Dr" then
+                speedlimit = 35
+            elseif street == "Vinewood Blvd" then
+                speedlimit = 40
+            elseif street == "Mirror Park Blvd" then
+                speedlimit = 35
+            elseif street == "Glory Way" then
+                speedlimit = 35
+            elseif street == "Bridge St" then
+                speedlimit = 35
+            elseif street == "West Mirror Drive" then
+                speedlimit = 35
+            elseif street == "Nikola Ave" then
+                speedlimit = 35
+            elseif street == "East Mirror Dr" then
+                speedlimit = 35
+            elseif street == "Nikola Pl" then
+                speedlimit = 25
+            elseif street == "Mirror Pl" then
+                speedlimit = 35
+            elseif street == "El Rancho Blvd" then
+                speedlimit = 40
+            elseif street == "Olympic Fwy" then
+                speedlimit = 60
+            elseif street == "Fudge Ln" then
+                speedlimit = 25
+            elseif street == "Amarillo Vista" then
+                speedlimit = 25
+            elseif street == "Labor Pl" then
+                speedlimit = 35
+            elseif street == "El Burro Blvd" then
+                speedlimit = 35
+            elseif street == "Sustancia Rd" then
+                speedlimit = 45
+            elseif street == "South Shambles St" then
+                speedlimit = 30
+            elseif street == "Hanger Way" then
+                speedlimit = 30
+            elseif street == "Orchardville Ave" then
+                speedlimit = 30
+            elseif street == "Popular St" then
+                speedlimit = 40
+            elseif street == "Buccaneer Way" then
+                speedlimit = 45
+            elseif street == "Abattoir Ave" then
+                speedlimit = 35
+            elseif street == "Voodoo Place" then
+                speedlimit = 30
+            elseif street == "Mutiny Rd" then
+                speedlimit = 35
+            elseif street == "South Arsenal St" then
+                speedlimit = 35
+            elseif street == "Forum Dr" then
+                speedlimit = 35
+            elseif street == "Morningwood Blvd" then
+                speedlimit = 35
+            elseif street == "Dorset Dr" then
+                speedlimit = 40
+            elseif street == "Caesars Place" then
+                speedlimit = 25
+            elseif street == "Spanish Ave" then
+                speedlimit = 30
+            elseif street == "Portola Dr" then
+                speedlimit = 30
+            elseif street == "Edwood Way" then
+                speedlimit = 25
+            elseif street == "San Vitus Blvd" then
+                speedlimit = 40
+            elseif street == "Eclipse Blvd" then
+                speedlimit = 35
+            elseif street == "Gentry Lane" then
+                speedlimit = 30
+            elseif street == "Las Lagunas Blvd" then
+                speedlimit = 40
+            elseif street == "Power St" then
+                speedlimit = 40
+            elseif street == "Mt Haan Rd" then
+                speedlimit = 40
+            elseif street == "Elgin Ave" then
+                speedlimit = 40
+            elseif street == "Hawick Ave" then
+                speedlimit = 35
+            elseif street == "Meteor St" then
+                speedlimit = 30
+            elseif street == "Alta Pl" then
+                speedlimit = 30
+            elseif street == "Occupation Ave" then
+                speedlimit = 35
+            elseif street == "Carcer Way" then
+                speedlimit = 40
+            elseif street == "Eastbourne Way" then
+                speedlimit = 30
+            elseif street == "Rockford Dr" then
+                speedlimit = 35
+            elseif street == "Abe Milton Pkwy" then
+                speedlimit = 35
+            elseif street == "Laguna Pl" then
+                speedlimit = 30
+            elseif street == "Sinners Passage" then
+                speedlimit = 30
+            elseif street == "Atlee St" then
+                speedlimit = 30
+            elseif street == "Sinner St" then
+                speedlimit = 30
+            elseif street == "Supply St" then
+                speedlimit = 30
+            elseif street == "Amarillo Way" then
+                speedlimit = 35
+            elseif street == "Tower Way" then
+                speedlimit = 35
+            elseif street == "Decker St" then
+                speedlimit = 35
+            elseif street == "Tackle St" then
+                speedlimit = 25
+            elseif street == "Low Power St" then
+                speedlimit = 35
+            elseif street == "Clinton Ave" then
+                speedlimit = 35
+            elseif street == "Fenwell Pl" then
+                speedlimit = 35
+            elseif street == "Utopia Gardens" then
+                speedlimit = 25
+			elseif street == "Peaceful Street" then
+				speedlimit = 25
+            elseif street == "Cavalry Blvd" then
+                speedlimit = 35
+            elseif street == "South Boulevard Del Perro" then
+                speedlimit = 35
+            elseif street == "Americano Way" then
+                speedlimit = 25
+            elseif street == "Sam Austin Dr" then
+                speedlimit = 25
+            elseif street == "East Galileo Ave" then
+                speedlimit = 35
+            elseif street == "Galileo Park" then
+                speedlimit = 35
+            elseif street == "West Galileo Ave" then
+                speedlimit = 35
+            elseif street == "Tongva Dr" then
+                speedlimit = 40
+            elseif street == "Zancudo Rd" then
+                speedlimit = 35
+            elseif street == "Movie Star Way" then
+                speedlimit = 35
+            elseif street == "Heritage Way" then
+                speedlimit = 35
+            elseif street == "Perth St" then
+                speedlimit = 25
+            elseif street == "Chianski Passage" then
+                speedlimit = 30
+	    elseif street == "Lolita Ave" then
+		speedlimit = 35
+	    elseif street == "Meringue Ln" then
+		speedlimit = 35
+	    elseif street == "Strangeways Dr" then
+		speedlimit = 30
             else
-                Emotes = Emotes .. ', ' .. Emote.name
+                speedlimit = "  ~r~N/A  "
             end
-        end
-
-        TriggerEvent('chat:addMessage', {
-            multiline = true,
-            color = {255, 0 ,0},
-            args = {'Emotes', '\n^r^7' .. Emotes},
-        })
+			
+			if speedlimitshow == true then
+            DrawTxt(0.514, 1.235, 1.0,1.0,0.45,"~y~Speedlimit: ~w~"..speedlimit.."~y~ mph", 252,186,3,200)
+			end
+		end
     end
 end)
 
-RegisterCommand('emote', function(source, args, rawCommand)
-    if EmoteRestrict() then
-        local SelectedEmote = args[1]
+function DrawTxt(x,y ,width,height,scale, text, r,g,b,a)
+    SetTextFont(6)
+    SetTextProportional(0)
+    SetTextScale(scale, scale)
+    SetTextColour(r, g, b, a)
+    SetTextDropShadow(0, 0, 0, 0,255)
+    SetTextEdge(1, 0, 0, 0, 255)
+    SetTextOutline()
+    SetTextEntry("STRING")
+    AddTextComponentString(text)
+    DrawText(x - width/2, y - height/2 + 0.005)
+end
 
-        for _, Emote in pairs(Config.EmotesList) do
-            if Emote.name == SelectedEmote then
-                PlayEmote(Emote.emote, Emote.name)
-                return
-            end
-        end
+--Location PLD
+function drawTxt(x,y ,width,height,scale, text, r,g,b,a)
+	if not HideHud then
+		SetTextFont(4)
+		SetTextProportional(0)
+		SetTextScale(scale, scale)
+		SetTextColour(r, g, b, a)
+		SetTextDropShadow(0, 0, 0, 0,255)
+		SetTextEdge(1, 0, 0, 0, 255)
+		SetTextDropShadow()
+		SetTextOutline()
+		SetTextEntry("STRING")
+		AddTextComponentString(text)
+		DrawText(x - width/2, y - height/2 + 0.005)
+	end
+end
 
-        TriggerEvent('chat:addMessage', {
-            multiline = true,
-            color = {255, 0, 0},
-            args = {'Emotes', 'Invalid Emote!'},
-        })
-    end
+function drawTxt2(x,y ,width,height,scale, text, r,g,b,a)
+	if not HideHud then
+		SetTextFont(6)
+		SetTextProportional(0)
+		SetTextScale(scale, scale)
+		SetTextColour(r, g, b, a)
+		SetTextDropShadow(0, 0, 0, 0,255)
+		SetTextEdge(1, 0, 0, 0, 255)
+		SetTextDropShadow()
+		SetTextOutline()
+		SetTextEntry("STRING")
+		AddTextComponentString(text)
+		DrawText(x - width/2, y - height/2 + 0.005)
+	end
+end
+
+local directions = { [0] = 'N', [45] = 'NW', [90] = 'W', [135] = 'SW', [180] = 'S', [225] = 'SE', [270] = 'E', [315] = 'NE', [360] = 'N', } 
+Citizen.CreateThread(function()
+	while true do
+		Citizen.Wait(1)
+
+		local ped = GetPlayerPed(-1)
+		local vehicle = GetVehiclePedIsIn(ped, false)
+		local directions = { [0] = 'N', [45] = 'NW', [90] = 'W', [135] = 'SW', [180] = 'S', [225] = 'SE', [270] = 'E', [315] = 'NE', [360] = 'N', } 
+		
+		local pos = GetEntityCoords(PlayerPedId())
+		local var1, var2 = GetStreetNameAtCoord(pos.x, pos.y, pos.z, Citizen.ResultAsInteger(), Citizen.ResultAsInteger())
+		local current_zone = GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z))
+		
+		for k,v in pairs(directions)do
+			direction = GetEntityHeading(PlayerPedId())
+			if(math.abs(direction - k) < 22.5)then
+				direction = v
+				break
+			end
+		end
+		
+	AddEventHandler("hidelocationhud", function(hide)
+		DisplayLocation = false
+	end)
+	AddEventHandler("showlocationhud", function(show)
+		DisplayLocation = true
+	end)
+	
+	if DisplayLocation == true then
+		if (checkForVehicle == false) then 
+			if GetStreetNameFromHashKey(var1) and GetNameOfZone(pos.x, pos.y, pos.z) then
+				if GetStreetNameFromHashKey(var1) then
+					if direction == 'N' then
+							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.306, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+						if GetStreetNameFromHashKey(var2) == "" then
+							drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+						else 
+							drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+						end
+							drawTxt2(x-0.285, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+					elseif direction == 'NE' then 
+							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.298, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+						if GetStreetNameFromHashKey(var2) == "" then
+							drawTxt2(x-0.277, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+						else 
+							drawTxt2(x-0.277, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+						end
+						drawTxt2(x-0.277, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1),curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+					elseif direction == 'E' then 
+							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.309, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+						if GetStreetNameFromHashKey(var2) == "" then
+							drawTxt2(x-0.288, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+						else 
+							drawTxt2(x-0.288, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+						end
+						drawTxt2(x-0.288, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+					elseif direction == 'SE' then 
+							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.298, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+						if GetStreetNameFromHashKey(var2) == "" then
+							drawTxt2(x-0.275, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+						else 
+							drawTxt2(x-0.275, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+						end
+							drawTxt2(x-0.275, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+					elseif direction == 'S' then
+							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.307, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+						if GetStreetNameFromHashKey(var2) == "" then
+							drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+						else 
+							drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+						end
+							drawTxt2(x-0.285, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+					elseif direction == 'SW' then
+							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.292, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+						if GetStreetNameFromHashKey(var2) == "" then
+							drawTxt2(x-0.270, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+						else 
+							drawTxt2(x-0.270, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+						end
+							drawTxt2(x-0.270, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+					elseif direction == 'W' then 
+							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.303, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+						if GetStreetNameFromHashKey(var2) == "" then 
+							drawTxt2(x-0.280, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+						else
+							drawTxt2(x-0.280, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+						end
+							drawTxt2(x-0.280, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+					elseif direction == 'NW' then
+							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.290, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+						if GetStreetNameFromHashKey(var2) == "" then
+							drawTxt2(x-0.266, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+						else 
+							drawTxt2(x-0.266, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+						end 
+							drawTxt2(x-0.266, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+					end
+				end
+			end
+		else 
+			if (vehicle ~= 0) then 
+				if GetStreetNameFromHashKey(var1) and GetNameOfZone(pos.x, pos.y, pos.z) then
+					if GetStreetNameFromHashKey(var1) then
+						if direction == 'N' then
+								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.306, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+							if GetStreetNameFromHashKey(var2) == "" then
+								drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+							else 
+								drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+							end
+								drawTxt2(x-0.285, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+						elseif direction == 'NE' then 
+								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.298, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+							if GetStreetNameFromHashKey(var2) == "" then
+								drawTxt2(x-0.277, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+							else 
+								drawTxt2(x-0.277, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+							end
+							drawTxt2(x-0.277, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1),curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+						elseif direction == 'E' then 
+								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.309, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+							if GetStreetNameFromHashKey(var2) == "" then
+								drawTxt2(x-0.288, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+							else 
+								drawTxt2(x-0.288, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+							end
+							drawTxt2(x-0.288, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+						elseif direction == 'SE' then 
+								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.298, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+							if GetStreetNameFromHashKey(var2) == "" then
+								drawTxt2(x-0.275, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+							else 
+								drawTxt2(x-0.275, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+							end
+								drawTxt2(x-0.275, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+						elseif direction == 'S' then
+								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.307, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+							if GetStreetNameFromHashKey(var2) == "" then
+								drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+							else 
+								drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+							end
+								drawTxt2(x-0.285, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+						elseif direction == 'SW' then
+								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.292, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+							if GetStreetNameFromHashKey(var2) == "" then
+								drawTxt2(x-0.270, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+							else 
+								drawTxt2(x-0.270, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+							end
+								drawTxt2(x-0.270, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+						elseif direction == 'W' then 
+								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.303, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+							if GetStreetNameFromHashKey(var2) == "" then 
+								drawTxt2(x-0.280, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+							else
+								drawTxt2(x-0.280, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+							end
+								drawTxt2(x-0.280, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+						elseif direction == 'NW' then
+								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.290, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
+								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
+							if GetStreetNameFromHashKey(var2) == "" then
+								drawTxt2(x-0.266, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
+							else 
+								drawTxt2(x-0.266, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
+							end 
+								drawTxt2(x-0.266, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
+						end
+					end
+				end
+			end
+		end
+	end
+end
 end)
 
-RegisterCommand('coords', function(source, args, rawCommand)
-    local Coords = GetEntityCoords(PlayerPedId())
-    local Heading = GetEntityHeading(PlayerPedId())
+--Hands Up Animation
 
-    TriggerEvent('chatMessage', 'Coords', {255, 255, 0}, '\nX: ' .. Coords.x .. '\nY: ' .. Coords.y .. '\nZ: ' .. Coords.z .. '\nHeading: ' .. Heading)
+RegisterNetEvent("THU")
+AddEventHandler("THU", function()
+	
+	local playerPed = GetPlayerPed(-1)
+	if DoesEntityExist(playerPed) then
+		Citizen.CreateThread(function()
+			RequestAnimDict("random@getawaydriver")
+			while not HasAnimDictLoaded("random@getawaydriver") do
+				Citizen.Wait(100)
+			end
+			
+			if IsEntityPlayingAnim(playerPed, "random@getawaydriver", "idle_2_hands_up", 3) then
+				ClearPedSecondaryTask(playerPed)
+			else
+				TaskPlayAnim(playerPed, "random@getawaydriver", "idle_2_hands_up", 8.0, -8, -1, 50, 0, 0, 0, 0)
+			end		
+		end)
+	end
 end)
+
+-- Hands Up Kneel Animation
+local HUKToggle = false
+
+RegisterNetEvent("HandsupKnees")
+AddEventHandler("HandsupKnees", function()
+	HUKToggle = not HUKToggle
+	ToggleHUK(HUKToggle)
+end)
+	
+	function ToggleHUK(toggle)
+
+	local lPed = PlayerPedId()
+	
+	if(toggle) then
+	
+			 RequestAnimDict("random")
+			RequestAnimDict("random@getawaydriver")
+			while not HasAnimDictLoaded("random@getawaydriver") do
+				Citizen.Wait(100)
+			end
+			
+			TaskPlayAnim(lPed, "random@getawaydriver", "idle_2_hands_up", 1.0, -1, -1, 0, 0, 0, 0, 0)
+				Citizen.Wait(3500)
+				TaskPlayAnim(lPed, "random@getawaydriver", "idle_a", 1.0, -1, -1, 1, 0, 0, 0, 0)
+				SetEnableHandcuffs(lPed, true)
+			
+		else
+			if IsEntityPlayingAnim(lPed, "random@getawaydriver", "idle_a", 3) and IsEntityPlayingAnim(lPed, "mp_arresting", "idle", 3) then
+				StopAnimTask(lPed, "random@getawaydriver", "idle_a", 3)
+				StopAnimTask(lPed, "random@getawaydriver", "idle_2_hands_up", 3)
+				TaskPlayAnim(lPed, "random@getawaydriver", "hands_up_2_idle", 1.0, -1, -1, 0, 0, 0, 0, 0)
+				ClearPedSecondaryTask(lPed)
+				TaskPlayAnim(lPed, "mp_arresting", "idle", 8.0, -8, -1, 49, 0, 0, 0, 0)
+				SetEnableHandcuffs(lPed, true)
+				
+				elseif IsEntityPlayingAnim(lPed, "random@getawaydriver", "idle_a", 3) then
+				StopAnimTask(lPed, "random@getawaydriver", "idle_a", 3)
+				StopAnimTask(lPed, "random@getawaydriver", "idle_2_hands_up", 3)
+				TaskPlayAnim(lPed, "random@getawaydriver", "hands_up_2_idle", 1.0, -1, -1, 0, 0, 0, 0, 0)
+				ClearPedSecondaryTask(lPed)
+				SetEnableHandcuffs(lPed, false)
+
+			end		
+		end
+	end

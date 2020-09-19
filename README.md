@@ -14,25 +14,17 @@ SEM_InteractionMenu was made by Scott1 using NativeUI [LUA] | This version was c
 Current Version for Custom Version: **v1.5.3**
 
 Changes: **• Re-Arranged most menus**
-
 Added: **• Settings Tab, Toggleable UI, Priority Status**
-
 Fixes: **• Shield not working properly, • Priority Status is now Fully Functional**
-
 Bugs: **• No Bugs currently.**
-
 Options: **• Toggle UI for MY version of the Nearest Postal script, • Toggle UI for MY version of the SpeedLimit script**
-
 Requirements to make the Options work:
-
 **• Link to MY version of the Nearest Postal Script:** [Nearest Postal Script](https://github.com/GoldenTCode/Custom-Nearest-Postal-Script)
-
 **• Link to MY version of the SpeedLimit Script:** [SpeedLimit Script](https://github.com/GoldenTCode/Custom_Posted_Speed_Limit)
 
 
-## ALL CREDITS GO TO SCOTT M
+## ALL CREDITS GO TO SCOTT1
 [Original Menu - FiveM](https://forum.cfx.re/t/release-interactionmenu/912635)
-
 [Original Menu - GitHub](https://github.com/Sc0ttM/SEM_InteractionMenu)
 
 ### Links:

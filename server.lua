@@ -1,16 +1,4 @@
---[[
-───────────────────────────────────────────────────────────────
 
-	SEM_InteractionMenu (server.lua) - Created by Scott M
-	Current Version: v1.5.1 (June 2020)
-	
-	Support: https://semdevelopment.com/discord
-	
-		!!! Change vaules in the 'config.lua' !!!
-	DO NOT EDIT THIS IF YOU DON'T KNOW WHAT YOU ARE DOING
-	
-───────────────────────────────────────────────────────────────
-]]
 timermax = 21
 cooldown = 0
 ispriority = false
@@ -180,45 +168,44 @@ AddEventHandler('SEM_InteractionMenu:FirePerms', function()
 	end
 end)
 
-
-
 Citizen.CreateThread(function()
-	local CurrentVersion = GetResourceMetadata(GetCurrentResourceName(), 'version', 0)
 	SetConvarServerInfo("Server", 1)
 	SetConvarServerInfo("Framework", "Custom ESX")
-	
-	if not CurrentVersion then
-		print('^1GoldenRP Menu Version Check Failed!^7')
-	end
+end)
 
-	function VersionCheckHTTPRequest()
-		PerformHttpRequest('https://semdevelopment.com/releases/interactionmenu/info/version.json', VersionCheck, 'GET')
-	end
-
-	function VersionCheck(err, response, headers)
-		Citizen.Wait(3000)
-		if err == 200 then
-			local Data = json.decode(response)
-			
-			if CurrentVersion ~= Data.NewestVersion then
-				print('\n--------------------------------------------------------------------------')
-				print('\nGoldenRP Menu is outdated!')
-				print('Current Version: ^2' .. Data.NewestVersion .. '^7')
-				print('Your Version: ^1' .. CurrentVersion .. '^7')
-				print('Please download the lastest version from ^5' .. Data.DownloadLocation .. '^7')
-				if Data.Changes ~= '' then
-					print('\n^5Changes: ^7' .. Data.Changes)
-				end
-				print('\n--------------------------------------------------------------------------\n^7')
-			else
-				print('^2GoldenRP Menu is up to date!^7')
-			end
-		else
-			print('^1GoldenRP Menu Version Check Failed!^7')
+--Hands Up
+AddEventHandler("chatMessage", function(source, name, message)
+	if (startswith(message, "/")) then
+		local cmd = stringsplit(message, " ")
+		if cmd[1] == "/hu" then
+			CancelEvent()
+			TriggerClientEvent("THU", source)
 		end
-		
-		SetTimeout(60000000, VersionCheckHTTPRequest)
 	end
+end)
 
-	VersionCheckHTTPRequest()
+function startswith(String, Start)
+	return string.sub(String,1,string.len(Start))==Start
+end
+
+function stringsplit(inputstr, sep)
+    if sep == nil then
+        sep = "%s"
+    end
+    local t={} ; i=1
+    for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+        t[i] = str
+        i = i + 1
+    end
+    return t
+end
+
+--Hands Up Kneel
+
+RegisterServerEvent("chatMessage")
+AddEventHandler("chatMessage", function(source, n, message)
+	if message == "/huk" then
+		CancelEvent()
+		TriggerClientEvent("HandsupKnees", source)
+	end
 end)
