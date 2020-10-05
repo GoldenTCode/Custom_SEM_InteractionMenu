@@ -12,15 +12,13 @@ SEM_InteractionMenu was made by Scott1 using NativeUI [LUA] | This version was c
 
 ### Information:
 
-Current Version for Custom Version: **v1.5.3**
+Current Version for Custom_SEM_InteractionMenu: **v1.5.4**
 
 Changes: **• Re-Arranged most menus**
 
-Added: **• Settings Tab, • Toggleable UI, • Priority Status**
+Added: **• Settings Tab, • Toggleable UI, • Priority Status, • Toggle Menu Position**
 
-Fixes: **• Shield not working properly**
-
-Bugs: **• You are required to have ESX to use the commands `/hood` and `/trunk` outside of your vehicle. Trying to find a fix <<**
+Fixes: **• Shield not working properly, • Fixed the /hood and /trunk commands, You can now use /hood and /trunk outside of the vehicle.**
 
 ## ALL CREDITS GO TO SCOTT1
 
