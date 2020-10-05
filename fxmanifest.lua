@@ -6,7 +6,7 @@ games {'gta5'}
 title 'Golden_Menu'
 description 'GoldenRP M Menu'
 author 'Customized by Xd_Golden_Tiger. Full Credits go to Scott M'
-version 'v1.5.3'
+version 'v1.5.4'
 
 client_scripts {
     'dependencies/NativeUI.lua',
