@@ -1,12 +1,4 @@
 
-ESX               = nil
-
-Citizen.CreateThread(function()
-  while ESX == nil do
-    TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
-    Citizen.Wait(0)
-  end
-end)
 
 --Cuffing Event
 RegisterNetEvent('SEM_InteractionMenu:Cuff')
@@ -505,7 +497,28 @@ AddEventHandler('SEM_InteractionMenu:InventoryResult', function(Inventory)
     Notify('~b~Inventory Items: ~g~' .. Inventory)
 end)
 
+--Station Blips
+Citizen.CreateThread(function()
+        local function CreateBlip(x, y, z, Name, Colour, Sprite)
+            StationBlip = AddBlipForCoord(x, y, z)
+            SetBlipSprite(StationBlip, Sprite)
+            SetBlipDisplay(StationBlip, 3)
+            SetBlipScale(StationBlip, 1.0)
+            SetBlipColour(StationBlip, Colour)
+            SetBlipAsShortRange(StationBlip, true)
+        
+            BeginTextCommandSetBlipName('STRING')
+            AddTextComponentString(Name)
+            EndTextCommandSetBlipName(StationBlip)
+        end
 
+        for _, Station in pairs(Config.LEOStations) do
+            CreateBlip(Station.coords.x, Station.coords.y, Station.coords.z, 'Police Station', 38, 60)
+        end
+        for _, Station in pairs(Config.FireStations) do
+            CreateBlip(Station.coords.x, Station.coords.y, Station.coords.z, 'Fire Station', 1, 60)
+        end
+end)
 
 --BAC
 RegisterNetEvent('SEM_InteractionMenu:BACResult')
@@ -535,47 +548,32 @@ Citizen.CreateThread(function()
     TriggerEvent('chat:addSuggestion', '/drag', 'Drag Player', {{name = 'ID', help = 'Players Server ID'}})
     TriggerEvent('chat:addSuggestion', '/dropweapon', 'Drops Weapon in Hand')
 end)
-
+cuffme = true
 RegisterCommand('cuff', function(source, args, rawCommand)
-    if LEORestrict() or FireRestrict() then
         if args[1] ~= nil then
             local ID = tonumber(args[1])
-            if Config.CommandDistanceChecked then
-                if GetDistance(source) < Config.CommandDistance then
-                    TriggerServerEvent('SEM_InteractionMenu:CuffNear', ID)
-                else
-                    Notify('~r~That player is too far away')
-                end
-            else
-                TriggerServerEvent('SEM_InteractionMenu:CuffNear', ID)
-            end
-        else
-            TriggerServerEvent('SEM_InteractionMenu:CuffNear', GetClosestPlayer())
-        end
-    else
-        Notify('~r~Insufficient Permissions')
-    end
+            TriggerServerEvent('SEM_InteractionMenu:CuffNear', ID)
+		elseif args[1] == 'me' then
+			local playernameme = GetPlayerId(source)
+			local ID = tonumber(playernameme)
+			TriggerServerEvent('SEM_InteractionMenu:CuffNear', ID)
+		end
+end)
+
+RegisterCommand('cuffme', function(source, args, rawCommand)
+local cuffmeped = GetPlayerPed(source)
+TriggerServerEvent('SEM_InteractionMenu:CuffNear', cuffmeped)
 end)
 
 RegisterCommand('drag', function(source, args, rawCommand)
-    if LEORestrict() or FireRestrict() then
         if args[1] ~= nil then
             local ID = tonumber(args[1])
-            if Config.CommandDistanceChecked then
-                if GetDistance(source) < Config.CommandDistance then
+                if GetDistance(source) <= 5.0 then
                     TriggerServerEvent('SEM_InteractionMenu:DragNear', ID)
                 else
                     Notify('~r~That player is too far away')
                 end
-            else
-                TriggerServerEvent('SEM_InteractionMenu:DragNear', ID)
-            end
-        else
-            TriggerServerEvent('SEM_InteractionMenu:DragNear', GetClosestPlayer())
-        end
-    else
-        Notify('~r~Insufficient Permissions')
-    end
+		end
 end)
 
 RegisterCommand('dropweapon', function(source, args, rawCommand)
@@ -590,6 +588,14 @@ RegisterCommand('clear', function(source, args, rawCommand)
     Notify('~r~All Weapons Cleared!')
 end)
 
+RegisterCommand('canim', function(source, args, rawCommand)
+local ped = GetPlayerPed(-1)
+local playerCoords = GetEntityCoords(PlayerPedId())
+		local animDict = "anim@amb@nightclub@dancers@crowddance_single_props@med_intensity"
+		local animName = "mi_dance_prop_09_v1_male^4"
+		TaskPlayAnim(ped, animDict, animName, 3.0, 3.0, 10000, 10, 1.0, 0, 0, 0)
+end)
+
 RegisterCommand('eng', function(source, args, rawCommand)
     local Veh = GetVehiclePedIsIn(PlayerPedId(), false)
     if Veh ~= nil and Veh ~= 0 and GetPedInVehicleSeat(Veh, 0) then
@@ -599,50 +605,60 @@ RegisterCommand('eng', function(source, args, rawCommand)
 end)
 
 RegisterCommand('hood', function(source, args, rawCommand)
-    local Veh = GetVehiclePedIsIn(PlayerPedId(), false)
 	local player = source
-    local ped = GetPlayerPed(player)
-    local playerCoords = GetEntityCoords(ped)
-	local nearVeh = ESX.Game.GetClosestVehicle(playerCoords)
+	local ped = GetPlayerPed(player)
+    local Veh = GetVehiclePedIsIn(PlayerPedId(), false)
+	local coordA = GetEntityCoords(ped, 1)
+	local coordB = GetOffsetFromEntityInWorldCoords(ped, 0.0, 5.0, 0.0)
+	local targetVehicle = getVehicleInDirection(coordA, coordB)
 	
-    if Veh ~= nil and Veh ~= 0 and Veh ~= 1 then
-        if GetVehicleDoorAngleRatio(Veh, 4) > 0 then
-            SetVehicleDoorShut(Veh, 4, false)
+    if targetVehicle ~= 0 then
+        if GetVehicleDoorAngleRatio(targetVehicle, 4) > 0 then
+            SetVehicleDoorShut(targetVehicle, 4, false)
+        else
+            SetVehicleDoorOpen(targetVehicle, 4, false, false)
+        end
+	else if targetVehicle == 0 then
+		if GetVehicleDoorAngleRatio(Veh, 4) > 0 then
+			SetVehicleDoorShut(Veh, 4, false)
         else
             SetVehicleDoorOpen(Veh, 4, false, false)
-        end
-	else
-		if GetVehicleDoorAngleRatio(nearVeh, 4) > 0 then
-			SetVehicleDoorShut(nearVeh, 4, false)
-        else
-            SetVehicleDoorOpen(nearVeh, 4, false, false)
 		end
+	end
 	end
 	Notify('~g~Hood Toggled!')
 end)
 
 RegisterCommand('trunk', function(source, args, rawCommand)
+    local player = source
+	local ped = GetPlayerPed(player)
     local Veh = GetVehiclePedIsIn(PlayerPedId(), false)
-	local player = source
-    local ped = GetPlayerPed(player)
-    local playerCoords = GetEntityCoords(ped)
-	local nearVeh = ESX.Game.GetClosestVehicle(playerCoords)
-
-    if Veh ~= nil and Veh ~= 0 and Veh ~= 1 then
-        if GetVehicleDoorAngleRatio(Veh, 5) > 0 then
-            SetVehicleDoorShut(Veh, 5, false)
+	local coordA = GetEntityCoords(ped, 1)
+	local coordB = GetOffsetFromEntityInWorldCoords(ped, 0.0, 5.0, 0.0)
+	local targetVehicle = getVehicleInDirection(coordA, coordB)
+	
+    if targetVehicle ~= 0 then
+        if GetVehicleDoorAngleRatio(targetVehicle, 5) > 0 then
+            SetVehicleDoorShut(targetVehicle, 5, false)
+        else
+            SetVehicleDoorOpen(targetVehicle, 5, false, false)
+		end
+	else if targetVehicle == 0 then
+		if GetVehicleDoorAngleRatio(Veh, 5) > 0 then
+			SetVehicleDoorShut(Veh, 5, false)
         else
             SetVehicleDoorOpen(Veh, 5, false, false)
 		end
-	else
-		if GetVehicleDoorAngleRatio(nearVeh, 5) > 0 then
-			SetVehicleDoorShut(nearVeh, 5, false)
-        else
-            SetVehicleDoorOpen(nearVeh, 5, false, false)
-		end
+	end
 	end
 		Notify('~g~Trunk Toggled!')
 end)
+
+function getVehicleInDirection(coordFrom, coordTo)
+	local rayHandle = CastRayPointToPoint(coordFrom.x, coordFrom.y, coordFrom.z, coordTo.x, coordTo.y, coordTo.z, 10, GetPlayerPed(-1), 0)
+	local a, b, c, d, vehicle = GetRaycastResult(rayHandle)
+	return vehicle
+end
 
 --SpeedLimit
 local speedlimit = "~r~~h~You havent added this street!"
@@ -1121,247 +1137,6 @@ function DrawTxt(x,y ,width,height,scale, text, r,g,b,a)
     AddTextComponentString(text)
     DrawText(x - width/2, y - height/2 + 0.005)
 end
-
---Location PLD
-function drawTxt(x,y ,width,height,scale, text, r,g,b,a)
-	if not HideHud then
-		SetTextFont(4)
-		SetTextProportional(0)
-		SetTextScale(scale, scale)
-		SetTextColour(r, g, b, a)
-		SetTextDropShadow(0, 0, 0, 0,255)
-		SetTextEdge(1, 0, 0, 0, 255)
-		SetTextDropShadow()
-		SetTextOutline()
-		SetTextEntry("STRING")
-		AddTextComponentString(text)
-		DrawText(x - width/2, y - height/2 + 0.005)
-	end
-end
-
-function drawTxt2(x,y ,width,height,scale, text, r,g,b,a)
-	if not HideHud then
-		SetTextFont(6)
-		SetTextProportional(0)
-		SetTextScale(scale, scale)
-		SetTextColour(r, g, b, a)
-		SetTextDropShadow(0, 0, 0, 0,255)
-		SetTextEdge(1, 0, 0, 0, 255)
-		SetTextDropShadow()
-		SetTextOutline()
-		SetTextEntry("STRING")
-		AddTextComponentString(text)
-		DrawText(x - width/2, y - height/2 + 0.005)
-	end
-end
-
-local directions = { [0] = 'N', [45] = 'NW', [90] = 'W', [135] = 'SW', [180] = 'S', [225] = 'SE', [270] = 'E', [315] = 'NE', [360] = 'N', } 
-Citizen.CreateThread(function()
-	while true do
-		Citizen.Wait(1)
-
-		local ped = GetPlayerPed(-1)
-		local vehicle = GetVehiclePedIsIn(ped, false)
-		local directions = { [0] = 'N', [45] = 'NW', [90] = 'W', [135] = 'SW', [180] = 'S', [225] = 'SE', [270] = 'E', [315] = 'NE', [360] = 'N', } 
-		
-		local pos = GetEntityCoords(PlayerPedId())
-		local var1, var2 = GetStreetNameAtCoord(pos.x, pos.y, pos.z, Citizen.ResultAsInteger(), Citizen.ResultAsInteger())
-		local current_zone = GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z))
-		
-		for k,v in pairs(directions)do
-			direction = GetEntityHeading(PlayerPedId())
-			if(math.abs(direction - k) < 22.5)then
-				direction = v
-				break
-			end
-		end
-		
-	AddEventHandler("hidelocationhud", function(hide)
-		DisplayLocation = false
-	end)
-	AddEventHandler("showlocationhud", function(show)
-		DisplayLocation = true
-	end)
-	
-	if DisplayLocation == true then
-		if (checkForVehicle == false) then 
-			if GetStreetNameFromHashKey(var1) and GetNameOfZone(pos.x, pos.y, pos.z) then
-				if GetStreetNameFromHashKey(var1) then
-					if direction == 'N' then
-							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.306, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-						if GetStreetNameFromHashKey(var2) == "" then
-							drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-						else 
-							drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-						end
-							drawTxt2(x-0.285, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-					elseif direction == 'NE' then 
-							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.298, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-						if GetStreetNameFromHashKey(var2) == "" then
-							drawTxt2(x-0.277, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-						else 
-							drawTxt2(x-0.277, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-						end
-						drawTxt2(x-0.277, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1),curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-					elseif direction == 'E' then 
-							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.309, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-						if GetStreetNameFromHashKey(var2) == "" then
-							drawTxt2(x-0.288, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-						else 
-							drawTxt2(x-0.288, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-						end
-						drawTxt2(x-0.288, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-					elseif direction == 'SE' then 
-							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.298, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-						if GetStreetNameFromHashKey(var2) == "" then
-							drawTxt2(x-0.275, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-						else 
-							drawTxt2(x-0.275, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-						end
-							drawTxt2(x-0.275, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-					elseif direction == 'S' then
-							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.307, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-						if GetStreetNameFromHashKey(var2) == "" then
-							drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-						else 
-							drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-						end
-							drawTxt2(x-0.285, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-					elseif direction == 'SW' then
-							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.292, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-						if GetStreetNameFromHashKey(var2) == "" then
-							drawTxt2(x-0.270, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-						else 
-							drawTxt2(x-0.270, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-						end
-							drawTxt2(x-0.270, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-					elseif direction == 'W' then 
-							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.303, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-						if GetStreetNameFromHashKey(var2) == "" then 
-							drawTxt2(x-0.280, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-						else
-							drawTxt2(x-0.280, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-						end
-							drawTxt2(x-0.280, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-					elseif direction == 'NW' then
-							drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.290, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-							drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-						if GetStreetNameFromHashKey(var2) == "" then
-							drawTxt2(x-0.266, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-						else 
-							drawTxt2(x-0.266, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-						end 
-							drawTxt2(x-0.266, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-					end
-				end
-			end
-		else 
-			if (vehicle ~= 0) then 
-				if GetStreetNameFromHashKey(var1) and GetNameOfZone(pos.x, pos.y, pos.z) then
-					if GetStreetNameFromHashKey(var1) then
-						if direction == 'N' then
-								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.306, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-							if GetStreetNameFromHashKey(var2) == "" then
-								drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-							else 
-								drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-							end
-								drawTxt2(x-0.285, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-						elseif direction == 'NE' then 
-								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.298, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-							if GetStreetNameFromHashKey(var2) == "" then
-								drawTxt2(x-0.277, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-							else 
-								drawTxt2(x-0.277, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-							end
-							drawTxt2(x-0.277, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1),curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-						elseif direction == 'E' then 
-								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.309, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-							if GetStreetNameFromHashKey(var2) == "" then
-								drawTxt2(x-0.288, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-							else 
-								drawTxt2(x-0.288, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-							end
-							drawTxt2(x-0.288, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-						elseif direction == 'SE' then 
-								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.298, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-							if GetStreetNameFromHashKey(var2) == "" then
-								drawTxt2(x-0.275, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-							else 
-								drawTxt2(x-0.275, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-							end
-								drawTxt2(x-0.275, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-						elseif direction == 'S' then
-								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.307, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-							if GetStreetNameFromHashKey(var2) == "" then
-								drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-							else 
-								drawTxt2(x-0.285, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-							end
-								drawTxt2(x-0.285, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-						elseif direction == 'SW' then
-								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.292, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-							if GetStreetNameFromHashKey(var2) == "" then
-								drawTxt2(x-0.270, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-							else 
-								drawTxt2(x-0.270, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-							end
-								drawTxt2(x-0.270, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-						elseif direction == 'W' then 
-								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.303, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-							if GetStreetNameFromHashKey(var2) == "" then 
-								drawTxt2(x-0.280, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-							else
-								drawTxt2(x-0.280, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-							end
-								drawTxt2(x-0.280, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-						elseif direction == 'NW' then
-								drawTxt(x-0.335, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.290, y+0.66, 1.0,1.5,1.4, " | ", border_r, border_g, border_b, border_a)
-								drawTxt(x-0.315, y+0.42, 1.0,1.0,1.0, direction, dir_r, dir_g, dir_b, dir_a)
-							if GetStreetNameFromHashKey(var2) == "" then
-								drawTxt2(x-0.266, y+0.45, 1.0,1.0,0.45, current_zone, town_r, town_g, town_b, town_a)
-							else 
-								drawTxt2(x-0.266, y+0.45, 1.0,1.0,0.45, GetStreetNameFromHashKey(var2) .. ", " .. GetLabelText(GetNameOfZone(pos.x, pos.y, pos.z)), str_around_r, str_around_g, str_around_b, str_around_a)
-							end 
-								drawTxt2(x-0.266, y+0.42, 1.0,1.0,0.55, GetStreetNameFromHashKey(var1), curr_street_r, curr_street_g, curr_street_b, curr_street_a)
-						end
-					end
-				end
-			end
-		end
-	end
-end
-end)
 
 --Hands Up Animation
 

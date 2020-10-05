@@ -70,11 +70,10 @@ AddEventHandler('SEM_InteractionMenu:CuffNear', function(ID)
 end)
 
 RegisterServerEvent('SEM_InteractionMenu:DragNear')
-AddEventHandler('SEM_InteractionMenu:DragNear', function(ID)
+AddEventHandler('SEM_InteractionMenu:DragNear', function(source, ID)
 	if ID == source then
 		return
 	end
-	
 	TriggerClientEvent('SEM_InteractionMenu:Drag', ID, source)
 end)
 

@@ -1,27 +1,17 @@
---[[
-───────────────────────────────────────────────────────────────
-
-	SEM_InteractionMenu (menu.lua) - Created by Scott M
-	Current Version: v1.5.1 (June 2020)
-	
-	Support | https://semdevelopment.com/discord
-	
-        !!! Change vaules in the 'config.lua' !!!
-	DO NOT EDIT THIS IF YOU DON'T KNOW WHAT YOU ARE DOING
-
-───────────────────────────────────────────────────────────────
-]]
 
 local cooldown = 0
 local ispriority = false
 local ishold = false
 local togglepriority = false
 
+TogRight = true
 EnabledUI = false
 EnabledNPUI = true
 EnabledSLUI = true
 EnabledLUI = true
 hudEnabled = false
+
+local menuPosition = {x = 0, y = 10}
 
 RegisterCommand("resetpcd", function()
     TriggerServerEvent("cancelcooldown")
@@ -117,7 +107,7 @@ function Menu()
 local MenuTitle = Config.MenuTitle
 	_MenuPool:Remove()
 	_MenuPool = NativeUI.CreatePool()
-	MainMenu = NativeUI.CreateMenu(MenuTitle, 'MAIN MENU')
+	MainMenu = NativeUI.CreateMenu(MenuTitle, 'MAIN MENU', menuPosition["x"], menuPosition["y"])
 	_MenuPool:Add(MainMenu)
 	MainMenu:SetMenuWidthOffset(Config.MenuWidth)
 	collectgarbage()
@@ -136,7 +126,7 @@ local MenuTitle = Config.MenuTitle
                 local Spikes = NativeUI.CreateItem('Deploy Spikes', '')
                 local Shield = NativeUI.CreateItem('Toggle Shield', '')
                 PropsList = {}
-                for _, Prop in pairs(Config.LEOProps) do
+                for _, Prop in pairs(Config.Props) do
                     table.insert(PropsList, Prop.name)
                 end
                 local Props = NativeUI.CreateListItem('Spawn Props', PropsList, 1, '')
@@ -150,10 +140,8 @@ local MenuTitle = Config.MenuTitle
                 LEOMenu:AddItem(BAC)
                 LEOMenu:AddItem(Spikes)
                 LEOMenu:AddItem(Shield)
-                if Config.DisplayProps then
                 LEOMenu:AddItem(Props)
                 LEOMenu:AddItem(RemoveProps)
-                end
                 Cuff.Activated = function(ParentMenu, SelectedItem)
                     local player = GetClosestPlayer()
                     if player ~= false then
@@ -235,16 +223,16 @@ local MenuTitle = Config.MenuTitle
                 end
                 LEOMenu.OnListSelect = function(sender, item, index)
                     if item == Props then
-                        for _, Prop in pairs(Config.LEOProps) do
+                        for _, Prop in pairs(Config.Props) do
                             if Prop.name == item:IndexToItem(index) then
-                                TriggerEvent('SEM_InteractionMenu:Object:SpawnObjects', Prop.spawncode, Prop.name)
+                                SpawnProp(Prop.spawncode, Prop.name)
                             end
                         end
                     end
                 end
                 RemoveProps.Activated = function(ParentMenu, SelectedItem)
-                    for _, Prop in pairs(Config.LEOProps) do
-                        DeleteOBJ(Prop.spawncode)
+                    for _, Prop in pairs(Config.Props) do
+                        DeleteProp(Prop.spawncode)
                     end
                 end
 
@@ -277,6 +265,28 @@ local MenuTitle = Config.MenuTitle
                     local player = GetClosestPlayer()
                     if player ~= false then
                         TriggerServerEvent('SEM_InteractionMenu:UnseatNear', player)
+                    end
+                end
+				PropsList = {}
+                for _, Prop in pairs(Config.Props) do
+                    table.insert(PropsList, Prop.name)
+                end
+                local Props = NativeUI.CreateListItem('Spawn Props', PropsList, 1, 'Spawn Objects/Props')
+                local RemoveProps = NativeUI.CreateItem('Remove Props', 'Removes Spawned Props')
+                FireMenu:AddItem(Props)
+                FireMenu:AddItem(RemoveProps)
+                FireMenu.OnListSelect = function(sender, item, index)
+                    if item == Props then
+                        for _, Prop in pairs(Config.Props) do
+                            if Prop.name == item:IndexToItem(index) then
+                                SpawnProp(Prop.spawncode, Prop.name)
+                            end
+                        end
+                    end
+                end
+                RemoveProps.Activated = function(ParentMenu, SelectedItem)
+                    for _, Prop in pairs(Config.Props) do
+                        DeleteProp(Prop.spawncode)
                     end
                 end
 
@@ -623,27 +633,39 @@ local MenuTitle = Config.MenuTitle
                         Notify('~r~You\'re not in a Vehicle!')
                     end
                 end
-				
-				local ToggleEmotes = NativeUI.CreateItem('Emote Menu', 'Open the emote menu.')
-				ToggleEmotes:RightLabel("→→→")
-                MainMenu:AddItem(ToggleEmotes)
-				ToggleEmotes.Activated = function(ParentMenu, SelectedItem)
-                     _MenuPool:CloseAllMenus()
-                     TriggerEvent('dp:RecieveMenu')
 
-                end
 				local Settings = _MenuPool:AddSubMenu(MainMenu, 'Settings', 'Open the settings.', true, false, "→→→")
 				Settings:SetMenuWidthOffset(Config.MenuWidth)
+				local TogglePosition = NativeUI.CreateItem('Toggle Menu Position', '')
 				local ToggleNPUI = NativeUI.CreateItem('Toggle Nearest Postal UI', '')
 				local ToggleSLUI = NativeUI.CreateItem('Toggle Speed Limit UI', '')
-				local ToggleLUI = NativeUI.CreateItem('Toggle Location PLD UI', '')
 				local About = NativeUI.CreateItem('About GoldenRP Menu', 'This M Menu is a personalized menu that Xd_Golden_Tiger worked hard on customizing.')
 				local Original = NativeUI.CreateItem('Original Credits', 'All Credits go to Scott M. Original menu: SEM_InteractionMenu.')
+				Settings:AddItem(TogglePosition)
 				Settings:AddItem(ToggleNPUI)
 				Settings:AddItem(ToggleSLUI)
-				Settings:AddItem(ToggleLUI)
 				Settings:AddItem(About)
 				Settings:AddItem(Original)
+				
+				TogglePosition.Activated = function(ParentMenu, SelectedItem)
+					TogRight = not TogRight
+					if TogRight then
+						menuPosition = { x = '0', y = '10'}
+						_MenuPool:CloseAllMenus()
+						Menu()
+						MainMenu:Visible(true)
+					elseif TogRight == false then
+						menuPosition = { x = '1390', y = '10'}
+						_MenuPool:CloseAllMenus()
+						Menu()
+						MainMenu:Visible(true)
+					else
+						menuPosition = { x = '0', y = '10'}
+						_MenuPool:CloseAllMenus()
+						Menu()
+						MainMenu:Visible(true)
+					end
+				end
 				
 				ToggleNPUI.Activated = function(ParentMenu, SelectedItem)
 				EnabledNPUI = not EnabledNPUI
@@ -664,17 +686,6 @@ local MenuTitle = Config.MenuTitle
 					TriggerEvent("hidespeedlimithud", hide)
 				else
 					TriggerEvent("showspeedlimithud", show)
-				end
-				end
-				
-				ToggleLUI.Activated = function(ParentMenu, SelectedItem)
-				EnabledLUI = not EnabledLUI
-				if EnabledLUI then
-					TriggerEvent("showlocationhud", show)
-				elseif EnabledLUI == false then
-					TriggerEvent("hidelocationhud", hide)
-				else
-					TriggerEvent("showlocationhud", show)
 				end
 				end
 
